@@ -633,7 +633,8 @@ static void auto_su(int argc, char *argv[])
 
 static void add_if(const char *iface)
 {
-	if (is_awg_on)
+	/* The kernel module handles AWG parameters too, so prefer it when loaded. */
+	if (is_awg_on && access("/sys/module/amneziawg", F_OK))
 		cmd("amneziawg-go %s", iface);
 	else
 		cmd("ip link add %s type amneziawg", iface);
@@ -1070,14 +1071,6 @@ static void set_config(const char *iface, const char *config)
 		exit(WIFEXITED(ret) ? WEXITSTATUS(ret) : EIO);
 }
 
-static void broadcast_change(void)
-{
-	const char *pkg = getenv("CALLING_PACKAGE");
-
-	if (!pkg || strcmp(pkg, AWG_PACKAGE_NAME))
-		cmd("am broadcast -a org.amnezia.awg.action.REFRESH_TUNNEL_STATES " AWG_PACKAGE_NAME);
-}
-
 static void print_search_paths(FILE *file, const char *prefix)
 {
 	_cleanup_free_ char *paths = strdup(AWG_CONFIG_SEARCH_PATHS);
@@ -1139,7 +1132,6 @@ static void cmd_up(const char *iface, const char *config, unsigned int mtu, cons
 	set_routes(iface, netid);
 	set_mtu(iface, mtu);
 	set_users(netid, excluded_applications, included_applications);
-	broadcast_change();
 
 	free(cleanup_iface);
 	cleanup_iface = NULL;
@@ -1166,7 +1158,6 @@ static void cmd_down(const char *iface)
 	}
 
 	del_if(iface);
-	broadcast_change();
 	exit(EXIT_SUCCESS);
 }
 
